@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { RotateCcw, Terminal } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TopNav } from "./TopNav";
@@ -27,7 +27,15 @@ export function Dashboard() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [demo, setDemo] = useState<DemoScenario | null>(null);
+  const [demoEmails, setDemoEmails] = useState<Record<string, string>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch demo emails on mount
+  useEffect(() => {
+    import("@/lib/analyze-email").then(({ fetchDemoEmails }) => {
+      fetchDemoEmails().then((emails) => setDemoEmails(emails));
+    });
+  }, []);
 
   const handleAnalyze = useCallback(async () => {
     if (!raw.trim()) {
@@ -60,7 +68,7 @@ export function Dashboard() {
   };
 
   const loadDemo = (s: DemoScenario) => {
-    setRaw(DEMO_EMAILS[s].raw);
+    setRaw(demoEmails[s] || DEMO_EMAILS[s].raw);
     setDemo(s);
     setError(null);
     setResult(null);

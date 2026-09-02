@@ -1,24 +1,4 @@
 import type { AnalysisResult } from "@/types/analysis";
-import { pickMockResult } from "@/data/mockAnalysis";
-
-/**
- * Single integration point for email analysis.
- *
- * TODAY: returns synthetic data after a simulated investigation delay.
- *
- * LATER (FastAPI): replace the body of `analyzeEmail` with:
- *
- *   const res = await fetch(`${import.meta.env.VITE_API_URL}/analyze-email`, {
- *     method: "POST",
- *     headers: { "Content-Type": "application/json" },
- *     body: JSON.stringify({ email_content: emailContent }),
- *   });
- *   if (!res.ok) throw new AnalysisError("Unable to analyze email. Please check the email format and try again.");
- *   return (await res.json()) as AnalysisResult;
- *
- * Nothing else in the UI needs to change as long as the API response matches
- * the `AnalysisResult` type in `src/types/analysis.ts`.
- */
 
 export class AnalysisError extends Error {}
 
@@ -33,17 +13,33 @@ function looksLikeEmail(raw: string) {
   return hasHeaderish || hasAddress;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+export async function fetchDemoEmails(): Promise<Record<string, string>> {
+  try {
+    const res = await fetch(`${API_URL}/demo-emails`);
+    if (!res.ok) return {};
+    return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch demo emails", e);
+    return {};
+  }
+}
+
 export async function analyzeEmail(emailContent: string, signal?: AbortSignal): Promise<AnalysisResult> {
   if (!emailContent.trim()) throw new AnalysisError(EMPTY_INPUT_MESSAGE);
   if (!looksLikeEmail(emailContent)) throw new AnalysisError(MALFORMED_MESSAGE);
 
-  await new Promise<void>((resolve, reject) => {
-    const t = setTimeout(resolve, 400);
-    signal?.addEventListener("abort", () => {
-      clearTimeout(t);
-      reject(new DOMException("aborted", "AbortError"));
-    });
+  const res = await fetch(`${API_URL}/analyze-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email_content: emailContent }),
+    signal,
   });
 
-  return { ...pickMockResult(emailContent), analyzed_at: new Date().toISOString(), source: "synthetic" };
+  if (!res.ok) {
+    throw new AnalysisError(MALFORMED_MESSAGE);
+  }
+  
+  return (await res.json()) as AnalysisResult;
 }
